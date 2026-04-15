@@ -916,7 +916,7 @@ const ProfileTab = ({ profile, setProfile, updateProfile, vendorId }) => {
 
       <View style={styles.infoBanner}>
         <View style={styles.infoIcon}>
-          <FeatherIcon name="alert-circle" size={20} color="#3B82F6" />
+          <FeatherIcon name="alert-circle" size={20} color="#ffff" />
         </View>
         <View style={styles.infoContent}>
           <Text style={styles.infoTitle}>💡 All Changes Reflect in Search Results</Text>

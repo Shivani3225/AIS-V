@@ -626,7 +626,7 @@ const DashboardScreen = () => {
                 {subscriptionData.isActive && subscriptionData.daysRemaining > 0 && (
                   <View style={styles.subscriptionRow}>
                     <View style={styles.subscriptionLabelContainer}>
-                      <Icon name="hourglass" size={16} color="#666" />
+                      <Icon name="clock" size={16} color="#666" />
                       <Text style={styles.subscriptionLabel}>Days Remaining</Text>
                     </View>
                     <View style={styles.daysRemainingContainer}>
