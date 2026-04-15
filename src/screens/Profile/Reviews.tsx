@@ -16,7 +16,7 @@ import { useNavigation } from "@react-navigation/native";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const BASE_URL = 'https://my-backend-dnj5.onrender.com/api';
+const BASE_URL = 'https://api.aissignatureevent.com/api';
 
 const Reviews = () => {
   const navigation = useNavigation();

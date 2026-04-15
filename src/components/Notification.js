@@ -16,7 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');
-const API_BASE_URL = 'https://my-backend-dnj5.onrender.com/api';
+const API_BASE_URL = 'https://api.aissignatureevent.com/api';
 
 /**
  * VendorNotifications Component

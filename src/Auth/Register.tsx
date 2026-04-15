@@ -23,7 +23,7 @@ import styles from './RegisterStyling';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RazorpayCheckout from 'react-native-razorpay';
 
-const API_BASE_URL = 'https://my-backend-dnj5.onrender.com/api';
+const API_BASE_URL = 'https://api.aissignatureevent.com/api';
 
 const VendorRegistration = () => {
   const navigation = useNavigation();

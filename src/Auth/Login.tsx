@@ -18,7 +18,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 Icon.loadFont();
 
-const BASE_URL = 'https://my-backend-dnj5.onrender.com/api';
+const BASE_URL = 'https://api.aissignatureevent.com/api';
 
 const Login = () => {
   const navigation = useNavigation();

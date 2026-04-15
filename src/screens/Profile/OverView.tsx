@@ -22,7 +22,7 @@ import BlogPost from './BlogPost';
 import VideoContent from './VideoContent';
 
 const { width: screenWidth } = Dimensions.get('window');
-const API_BASE_URL = 'https://my-backend-dnj5.onrender.com/api';
+const API_BASE_URL = 'https://api.aissignatureevent.com/api';
 
 const OverView = () => {
   const [showComponent, setShowComponent] = useState(null);

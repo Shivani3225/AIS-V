@@ -14,7 +14,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import CustomHeader from '../../components/header/CustomHeader';
 import { useNavigation } from '@react-navigation/native';
 
-const API_BASE_URL = 'https://my-backend-dnj5.onrender.com/api';
+const API_BASE_URL = 'https://api.aissignatureevent.com/api';
 const SubscriptionScreen = () => {
   const navigation = useNavigation();
   const [subscription, setSubscription] = useState(null);

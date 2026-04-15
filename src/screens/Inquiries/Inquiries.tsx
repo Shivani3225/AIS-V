@@ -16,7 +16,7 @@ import Icon from "react-native-vector-icons/Feather";
 import CustomHeader from "../../components/header/CustomHeader";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'https://my-backend-dnj5.onrender.com/api';
+const API_BASE_URL = 'https://api.aissignatureevent.com/api';
 
 const CustomerInquiryCard = () => {
   const [acceptModalVisible, setAcceptModalVisible] = useState(false);

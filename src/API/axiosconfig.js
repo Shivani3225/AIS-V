@@ -6,7 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // =============================================
 const ANDROID_EMULATOR = "http://10.0.2.2:5000/api";
 const IOS_SIMULATOR = "http://localhost:5000/api";
-const PRODUCTION = "https://my-backend-dnj5.onrender.com/api";
+const PRODUCTION = "https://api.aissignatureevent.com/api";
 
 // =============================================
 // SELECT ENV

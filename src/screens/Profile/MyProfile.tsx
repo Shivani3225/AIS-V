@@ -30,7 +30,7 @@ import BlogPost from './BlogPost';
 import Reviews from './Reviews';
 
 const { width } = Dimensions.get('window');
-const API_BASE_URL = 'https://my-backend-dnj5.onrender.com/api';
+const API_BASE_URL = 'https://api.aissignatureevent.com/api';
 
 /**
  * Professional Vendor Profile Dashboard with Custom Tabs

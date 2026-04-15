@@ -9,14 +9,17 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  Platform,
+  PermissionsAndroid,
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import { launchImageLibrary } from "react-native-image-picker";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import RNFS from "react-native-fs";
 
-const BASE_URL = 'https://my-backend-dnj5.onrender.com/api';
+const BASE_URL = 'https://api.aissignatureevent.com/api';
 
 const PortFolioGallery = () => {
   const navigation = useNavigation();
@@ -30,17 +33,42 @@ const PortFolioGallery = () => {
   const [currentUsage, setCurrentUsage] = useState({ portfolioCount: 0 });
   const [modalVisible, setModalVisible] = useState(false);
 
-  // Helper function to get auth token - using the correct key from login
+  useEffect(() => {
+    requestStoragePermission();
+    checkAuthAndFetch();
+  }, []);
+
+  const requestStoragePermission = async () => {
+    if (Platform.OS === "android") {
+      try {
+        const permission = Platform.Version >= 33
+          ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
+          : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
+
+        const granted = await PermissionsAndroid.request(permission, {
+          title: "Storage Permission",
+          message: "App needs access to your storage to upload images",
+          buttonNeutral: "Ask Me Later",
+          buttonNegative: "Cancel",
+          buttonPositive: "OK",
+        });
+
+        console.log("Storage permission:", granted);
+      } catch (err) {
+        console.warn(err);
+      }
+    }
+  };
+
+  // Helper function to get auth token
   const getAuthToken = async () => {
     try {
-      // Use the same token key as in login screen
       const token = await AsyncStorage.getItem("vendorToken");
       if (token) {
         console.log("✅ Token found, length:", token.length);
         return token;
       }
-      
-      console.log("❌ No auth token found (vendorToken key)");
+      console.log("❌ No auth token found");
       return null;
     } catch (error) {
       console.error("Error getting token:", error);
@@ -48,111 +76,6 @@ const PortFolioGallery = () => {
     }
   };
 
-  // API request helper with better error handling
- // API request helper - ISKO COMPLETELY REPLACE KAREIN
-const apiRequest = async (method, endpoint, data = null, isFormData = false) => {
-  try {
-    const token = await getAuthToken();
-    
-    if (!token) {
-      console.error("No auth token found");
-      throw new Error("Authentication required");
-    }
-
-    const config = {
-      method,
-      url: `${BASE_URL}${endpoint}`,
-      timeout: 120000,
-    };
-
-    // IMPORTANT: For FormData, don't set Content-Type header
-    if (isFormData) {
-      config.headers = {
-        "Authorization": `Bearer ${token}`,
-        // NO Content-Type header - let axios/browser set it with boundary
-      };
-      config.data = data;
-    } else {
-      config.headers = {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-      };
-      if (data) {
-        config.data = data;
-      }
-    }
-
-    console.log(`Making ${method} request to: ${BASE_URL}${endpoint}`);
-    const response = await axios(config);
-    console.log("Response status:", response.status);
-    
-    return response.data;
-  } catch (error) {
-    console.error("API Error Details:");
-    console.error("Error message:", error.message);
-    console.error("Error status:", error.response?.status);
-    console.error("Error data:", error.response?.data);
-    
-    // Log full error for debugging
-    if (error.message === "Network Error") {
-      console.error("FULL NETWORK ERROR:", JSON.stringify(error, null, 2));
-    }
-    
-    if (error.response?.status === 401) {
-      Alert.alert(
-        "Session Expired", 
-        "Please login again",
-        [
-          {
-            text: "Login",
-            onPress: () => navigation.replace("Login")
-          }
-        ]
-      );
-    }
-    
-    throw error;
-  }
-};
-
-
-// Add this function to test API connectivity
-const testAPIConnection = async () => {
-  try {
-    const token = await getAuthToken();
-    console.log("Testing API connection...");
-    console.log("Token exists:", !!token);
-    console.log("API URL:", BASE_URL);
-    
-    // Test with a simple GET request
-    const response = await axios({
-      method: 'GET',
-      url: `${BASE_URL}/vendor-profile/dashboard/me`,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 10000,
-    });
-    
-    console.log("API Connection: SUCCESS");
-    console.log("Response status:", response.status);
-    return true;
-  } catch (err) {
-    console.log("API Connection: FAILED");
-    console.log("Error:", err.message);
-    if (err.code === 'ECONNREFUSED') {
-      console.log("Server is not reachable. Check if server is running.");
-    }
-    return false;
-  }
-};
-
-// Call this in useEffect for debugging
-useEffect(() => {
-  checkAuthAndFetch();
-  testAPIConnection(); // Add this line
-}, []);
   const checkAuthAndFetch = async () => {
     const token = await getAuthToken();
     if (!token) {
@@ -172,50 +95,38 @@ useEffect(() => {
     fetchMedia();
   };
 
-  useEffect(() => {
-    checkAuthAndFetch();
-  }, []);
-
   const fetchMedia = async () => {
     try {
       setLoading(true);
-      console.log("Fetching media...");
-      const response = await apiRequest("get", "/vendor-profile/dashboard/me");
+      const token = await getAuthToken();
       
-      console.log("Response success:", response.success);
+      const response = await axios({
+        method: 'GET',
+        url: `${BASE_URL}/vendor-profile/dashboard/me`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
       
-      if (response.success) {
+      if (response.data.success) {
         // Filter to only show IMAGES (exclude videos)
-        const imagesOnly = (response.data.media || []).filter(
+        const imagesOnly = (response.data.data.media || []).filter(
           (item) => item.type === "image"
         );
         setMedia(imagesOnly);
-        setLimits(response.data.limits);
-        setPlanType(response.data.planKey || "free");
-        setCurrentUsage(response.data.currentUsage || { portfolioCount: 0 });
+        setLimits(response.data.data.limits);
+        setPlanType(response.data.data.planKey || "free");
+        setCurrentUsage(response.data.data.currentUsage || { portfolioCount: 0 });
         
         console.log("Images loaded:", imagesOnly.length);
       } else {
-        console.error("Response success false:", response);
-        Alert.alert("Error", response.message || "Failed to load media");
+        console.error("Response success false:", response.data);
+        Alert.alert("Error", response.data.message || "Failed to load media");
       }
     } catch (error) {
       console.error("Fetch media error:", error);
-      
-      let errorMessage = "Failed to load media";
-      if (error.response?.status === 401) {
-        errorMessage = "Please login again";
-      } else if (error.response?.status === 404) {
-        errorMessage = "API endpoint not found";
-      } else if (error.message === "Network Error") {
-        errorMessage = "Network error. Please check your internet connection.";
-      } else if (error.message === "Authentication required") {
-        errorMessage = "Please login to continue";
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      }
-      
-      Alert.alert("Error", errorMessage);
+      Alert.alert("Error", "Failed to load media");
     } finally {
       setLoading(false);
     }
@@ -232,16 +143,61 @@ useEffect(() => {
     return remaining === Infinity || remaining > 0;
   };
 
-  const getErrorMessage = (err, fallback = "Upload failed") => {
-    const apiMessage = err?.response?.data?.message || err?.response?.data?.error?.message;
-    const status = err?.response?.status;
+  // Normalize image URI for Android
+  const normalizeImageUriForAndroid = async (uri) => {
+    if (Platform.OS !== "android" || !uri || !uri.startsWith("content://")) {
+      return uri;
+    }
 
-    if (apiMessage) return apiMessage;
-    if (status === 413) return "File is too large for server limit.";
-    if (status === 403) return "Upload blocked by current plan limit.";
-    if (status === 415) return "Unsupported file type.";
-    return err?.message || fallback;
+    const destPath = `${RNFS.TemporaryDirectoryPath}/upload_${Date.now()}.jpg`;
+
+    try {
+      await RNFS.copyFile(uri, destPath);
+      console.log("Copied to temp file:", destPath);
+      return destPath;
+    } catch (err) {
+      console.warn("Copy failed, using original:", err);
+      return uri;
+    }
   };
+
+  // Function to get file type/mime type
+  const getFileType = (fileName) => {
+    const extension = fileName?.split('.').pop()?.toLowerCase() || '';
+    const mimeTypes = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'heic': 'image/heic',
+      'heif': 'image/heif',
+    };
+    return mimeTypes[extension] || 'image/jpeg';
+  };
+
+  // Enhanced function to log image details
+  const logImageDetails = async (file, fileInfo = null) => {
+    console.log('\n========== 📸 IMAGE DETAILS ==========');
+    console.log('📁 File Name:', file.fileName || file.name || 'Unknown');
+    console.log('📏 File Size:', file.fileSize ? `${(file.fileSize / (1024 * 1024)).toFixed(2)} MB (${file.fileSize} bytes)` : 'Unknown');
+    console.log('🎨 File Type/Extension:', file.type || file.fileName?.split('.').pop() || 'Unknown');
+    console.log('🖼️ MIME Type:', file.type || getFileType(file.fileName));
+    console.log('📍 File URI:', file.uri);
+    
+    if (file.width && file.height) {
+      console.log('📐 Dimensions:', `${file.width} x ${file.height} pixels`);
+    }
+    
+    if (fileInfo) {
+      console.log('💾 Actual File Size (RNFS):', `${(fileInfo.size / (1024 * 1024)).toFixed(2)} MB (${fileInfo.size} bytes)`);
+    }
+    
+    console.log('==========================================\n');
+  };
+
+  // Upload single image using RNFS
+ // Replace the uploadSingleImage function with this corrected version:
 
 const uploadSingleImage = async (file, attempt = 1) => {
   try {
@@ -251,37 +207,122 @@ const uploadSingleImage = async (file, attempt = 1) => {
       throw new Error("No token found");
     }
     
-    // Convert URI to blob
-    const response = await fetch(file.uri);
-    const blob = await response.blob();
+    // Log detailed image information before upload
+    await logImageDetails(file);
     
-    const formData = new FormData();
+    // Get the actual file path correctly
+    let filePath = file.uri;
+    
+    // Remove file:// prefix if present
+    if (filePath.startsWith('file://')) {
+      filePath = filePath.replace('file://', '');
+    }
+    
+    // For Android content:// URIs, we need to copy to a temporary file
+    if (Platform.OS === "android" && filePath.startsWith("content://")) {
+      const destPath = `${RNFS.TemporaryDirectoryPath}/upload_${Date.now()}_${file.fileName || 'image.jpg'}`;
+      
+      console.log(`📋 Copying content URI to temp file: ${destPath}`);
+      
+      try {
+        await RNFS.copyFile(filePath, destPath);
+        filePath = destPath;
+        console.log(`✅ Successfully copied to: ${filePath}`);
+      } catch (copyError) {
+        console.error(`❌ Failed to copy file: ${copyError}`);
+        throw new Error(`Failed to process image file: ${copyError.message}`);
+      }
+    }
+    
+    // Verify file exists
+    const exists = await RNFS.exists(filePath);
+    if (!exists) {
+      throw new Error(`File does not exist at path: ${filePath}`);
+    }
+    
+    // Get file stats for detailed size information
+    const fileInfo = await RNFS.stat(filePath);
+    console.log(`📊 File Stats - Size: ${(fileInfo.size / (1024 * 1024)).toFixed(2)} MB, Path: ${filePath}`);
+    
+    // Log again with actual file info
+    await logImageDetails(file, fileInfo);
+    
     const fileName = file.fileName || file.name || `photo_${Date.now()}.jpg`;
-    formData.append('file', blob, fileName);
-    formData.append('type', 'image');
+    const mimeType = file.type || getFileType(fileName);
     
-    console.log(`🚀 Uploading: ${fileName}, Size: ${blob.size} bytes`);
+    console.log(`🚀 Starting upload for: ${fileName}`);
+    console.log(`📤 Local file path: ${filePath}`);
+    console.log(`📤 MIME Type being sent: ${mimeType}`);
+    console.log(`📤 Upload URL: ${BASE_URL}/vendor-profile/media`);
     
-    const uploadResponse = await fetch(`${BASE_URL}/vendor-profile/media`, {
+    // Upload using RNFS - IMPORTANT: Use the correct API
+    const uploadResult = await RNFS.uploadFiles({
+      toUrl: `${BASE_URL}/vendor-profile/media`,
+      files: [
+        {
+          name: 'file',
+          filename: fileName,
+          filepath: filePath,  // This must be a LOCAL file path, not a URL
+          filetype: mimeType,
+        },
+      ],
+      fields: {
+        type: 'image',
+      },
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
       },
-      body: formData,
-    });
+      begin: (response) => {
+        console.log('📡 Upload began with jobId:', response.jobId);
+      },
+      progress: (response) => {
+        const progress = Math.round((response.totalBytesSent / response.totalBytesExpectedToSend) * 100);
+        const sentMB = (response.totalBytesSent / (1024 * 1024)).toFixed(2);
+        const totalMB = (response.totalBytesExpectedToSend / (1024 * 1024)).toFixed(2);
+        console.log(`📊 Upload progress: ${progress}% (${sentMB} MB / ${totalMB} MB)`);
+      },
+    }).promise;
     
-    if (!uploadResponse.ok) {
-      throw new Error(`HTTP ${uploadResponse.status}`);
+    console.log('✅ Upload result status:', uploadResult.statusCode);
+    console.log('📦 Upload result body:', uploadResult.body);
+    
+    // Clean up temp file if we created one
+    if (filePath.includes(RNFS.TemporaryDirectoryPath)) {
+      try {
+        await RNFS.unlink(filePath);
+        console.log('🧹 Temp file cleaned up:', filePath);
+      } catch (cleanupError) {
+        console.warn('Failed to clean up temp file:', cleanupError);
+      }
     }
     
-    const data = await uploadResponse.json();
-    console.log(`✅ Upload success`);
-    return { success: true, data };
+    let data;
+    try {
+      data = JSON.parse(uploadResult.body);
+    } catch (e) {
+      console.error('Failed to parse response:', e);
+      data = { success: false, message: uploadResult.body };
+    }
+    
+    if (uploadResult.statusCode === 200 || uploadResult.statusCode === 201) {
+      if (data.success) {
+        console.log(`🎉 Upload successful! File: ${fileName}, Size: ${(fileInfo.size / (1024 * 1024)).toFixed(2)} MB, Type: ${mimeType}`);
+        return { success: true, data };
+      } else {
+        throw new Error(data.message || 'Upload failed: Server returned success=false');
+      }
+    } else {
+      throw new Error(data.message || `Upload failed with status ${uploadResult.statusCode}`);
+    }
     
   } catch (err) {
-    console.log(`❌ Upload failed:`, err.message);
+    console.log(`❌ Upload failed (attempt ${attempt}):`, err.message);
+    console.log(`❌ Error details:`, err);
     
     if (attempt < 3) {
+      console.log(`🔄 Retrying upload (${attempt + 1}/3)...`);
       await new Promise(resolve => setTimeout(resolve, 2000));
       return uploadSingleImage(file, attempt + 1);
     }
@@ -289,6 +330,9 @@ const uploadSingleImage = async (file, attempt = 1) => {
     return { success: false, reason: err.message };
   }
 };
+
+// Also update the normalizeImageUriForAndroid function (can be removed since we handle it in uploadSingleImage now)
+// But keep it for compatibility or remove it entirely
 
   const pickImage = () => {
     if (!canUpload()) {
@@ -302,33 +346,47 @@ const uploadSingleImage = async (file, attempt = 1) => {
     launchImageLibrary(
       {
         mediaType: "photo",
-    selectionLimit: 1, // पहले 1 image से test करें
-    quality: 0.3, // और कम करें 0.3
-    maxWidth: 800,
-    maxHeight: 800,
-    includeBase64: false,
+        selectionLimit: 5, // Allow multiple images
+        quality: 0.8,
+        includeBase64: false,
       },
       async (response) => {
         if (response.didCancel) {
+          console.log("📱 User cancelled image selection");
           return;
         }
 
-        if (response.error) {
-          Alert.alert("Error", "Failed to pick image");
+        if (response.errorCode) {
+          console.error("❌ Image picker error:", response.errorMessage);
+          Alert.alert("Error", response.errorMessage);
           return;
         }
 
         if (response.assets && response.assets.length > 0) {
-          // Filter only images
+          console.log(`\n🖼️ Selected ${response.assets.length} image(s) for upload\n`);
+          
+          // Log each selected image details
+          response.assets.forEach((asset, index) => {
+            console.log(`📸 Image ${index + 1} Details:`);
+            console.log(`   Name: ${asset.fileName || 'Unknown'}`);
+            console.log(`   Size: ${asset.fileSize ? (asset.fileSize / (1024 * 1024)).toFixed(2) + ' MB' : 'Unknown'}`);
+            console.log(`   Type: ${asset.type || asset.fileName?.split('.').pop() || 'Unknown'}`);
+            console.log(`   Dimensions: ${asset.width || 'Unknown'} x ${asset.height || 'Unknown'}`);
+            console.log(`   URI: ${asset.uri}\n`);
+          });
+          
+          // Filter only images and check file size
           const validFiles = [];
           const errors = [];
 
           for (const asset of response.assets) {
             // Check file size (10 MB limit)
             if (asset.fileSize && asset.fileSize > 10 * 1024 * 1024) {
+              console.log(`⚠️ File too large: ${asset.fileName || "Image"} - ${(asset.fileSize / (1024 * 1024)).toFixed(2)} MB exceeds 10 MB limit`);
               errors.push(`${asset.fileName || "Image"}: Exceeds 10 MB limit`);
               continue;
             }
+            console.log(`✅ File valid: ${asset.fileName || "Image"} - ${asset.fileSize ? (asset.fileSize / (1024 * 1024)).toFixed(2) + ' MB' : 'Size unknown'}`);
             validFiles.push(asset);
           }
 
@@ -336,6 +394,10 @@ const uploadSingleImage = async (file, attempt = 1) => {
           const remaining = getRemainingUploads();
           const toUpload = remaining === Infinity ? validFiles : validFiles.slice(0, remaining);
           const skippedByLimit = validFiles.length - toUpload.length;
+
+          if (skippedByLimit > 0) {
+            console.log(`⚠️ Skipped ${skippedByLimit} file(s) due to plan limit (Remaining: ${remaining === Infinity ? 'Unlimited' : remaining})`);
+          }
 
           if (toUpload.length === 0) {
             if (errors.length > 0) {
@@ -349,66 +411,86 @@ const uploadSingleImage = async (file, attempt = 1) => {
             return;
           }
 
+          console.log(`\n📤 Preparing to upload ${toUpload.length} file(s) out of ${validFiles.length} valid file(s)\n`);
           await uploadImages(toUpload, skippedByLimit, errors);
         }
       }
     );
   };
 
- const uploadImages = async (filesToUpload, skippedByLimit, errors) => {
-  if (!filesToUpload.length) return;
-  
-  setUploading(true);
-  let successCount = 0;
-  const failedFiles = [...errors];
-  
-  // Upload one by one
-  for (let i = 0; i < filesToUpload.length; i++) {
-    const file = filesToUpload[i];
-    setUploadProgress(`${i + 1} / ${filesToUpload.length}`);
+  const uploadImages = async (filesToUpload, skippedByLimit, errors) => {
+    if (!filesToUpload.length) return;
     
-    console.log(`\n📸 Uploading ${i + 1}/${filesToUpload.length}: ${file.fileName}`);
+    setUploading(true);
+    let successCount = 0;
+    const failedFiles = [...errors];
     
-    const result = await uploadSingleImage(file);
+    console.log(`\n🚀 ========== STARTING BATCH UPLOAD ==========`);
+    console.log(`📊 Total files to upload: ${filesToUpload.length}`);
+    console.log(`🎯 Remaining quota: ${getRemainingUploads() === Infinity ? 'Unlimited' : getRemainingUploads()}\n`);
     
-    if (result.success) {
-      successCount++;
-      console.log(`✅ Success (${successCount}/${filesToUpload.length})`);
-    } else {
-      failedFiles.push(`${file.fileName || "Image"}: ${result.reason}`);
-      console.log(`❌ Failed: ${result.reason}`);
+    // Upload one by one
+    for (let i = 0; i < filesToUpload.length; i++) {
+      const file = filesToUpload[i];
+      const fileSizeMB = file.fileSize ? (file.fileSize / (1024 * 1024)).toFixed(2) : 'Unknown';
+      const fileType = file.type || file.fileName?.split('.').pop() || 'Unknown';
+      
+      console.log(`\n📤 ===== UPLOADING FILE ${i + 1}/${filesToUpload.length} =====`);
+      console.log(`📁 File: ${file.fileName || 'Unknown'}`);
+      console.log(`📏 Size: ${fileSizeMB} MB`);
+      console.log(`🎨 Type: ${fileType}`);
+      console.log(`📐 Dimensions: ${file.width || 'Unknown'} x ${file.height || 'Unknown'}`);
+      
+      setUploadProgress(`${i + 1} / ${filesToUpload.length}`);
+      
+      const result = await uploadSingleImage(file);
+      
+      if (result.success) {
+        successCount++;
+        console.log(`✅ SUCCESS! (${successCount}/${filesToUpload.length}) - File: ${file.fileName}`);
+      } else {
+        failedFiles.push(`${file.fileName || "Image"}: ${result.reason}`);
+        console.log(`❌ FAILED! - File: ${file.fileName || 'Unknown'}, Reason: ${result.reason}`);
+      }
+      
+      // Add delay between uploads
+      if (i < filesToUpload.length - 1) {
+        console.log(`⏳ Waiting 1.5 seconds before next upload...\n`);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
     }
     
-    // Add delay between uploads
-    if (i < filesToUpload.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+    console.log(`\n📊 ========== UPLOAD SUMMARY ==========`);
+    console.log(`✅ Successful uploads: ${successCount}`);
+    console.log(`❌ Failed uploads: ${failedFiles.length}`);
+    console.log(`⚠️ Skipped due to limit: ${skippedByLimit}`);
+    console.log(`📁 Total files processed: ${filesToUpload.length + skippedByLimit}`);
+    console.log(`=====================================\n`);
+    
+    // Refresh media after uploads
+    await fetchMedia();
+    
+    // Show result message
+    let message = "";
+    if (successCount > 0) {
+      message += `✅ ${successCount} file${successCount > 1 ? "s" : ""} uploaded — pending admin approval.\n\n`;
     }
-  }
-  
-  // Refresh media after uploads
-  await fetchMedia();
-  
-  // Show result message
-  let message = "";
-  if (successCount > 0) {
-    message += `✅ ${successCount} file${successCount > 1 ? "s" : ""} uploaded — pending admin approval.\n\n`;
-  }
-  if (failedFiles.length > 0) {
-    message += `❌ ${failedFiles.length} failed to upload.\n`;
-    message += `Failed:\n${failedFiles.slice(0, 3).join("\n")}`;
-    if (failedFiles.length > 3) {
-      message += `\n...and ${failedFiles.length - 3} more`;
+    if (failedFiles.length > 0) {
+      message += `❌ ${failedFiles.length} failed to upload.\n`;
+      message += `Failed:\n${failedFiles.slice(0, 3).join("\n")}`;
+      if (failedFiles.length > 3) {
+        message += `\n...and ${failedFiles.length - 3} more`;
+      }
     }
-  }
-  
-  if (skippedByLimit > 0) {
-    message += `\n\n⚠️ ${skippedByLimit} file${skippedByLimit > 1 ? "s were" : " was"} skipped due to plan limit.`;
-  }
-  
-  Alert.alert("Upload Complete", message || "No files uploaded");
-  setUploading(false);
-  setUploadProgress("");
-};
+    
+    if (skippedByLimit > 0) {
+      message += `\n\n⚠️ ${skippedByLimit} file${skippedByLimit > 1 ? "s were" : " was"} skipped due to plan limit.`;
+    }
+    
+    Alert.alert("Upload Complete", message || "No files uploaded");
+    setUploading(false);
+    setUploadProgress("");
+  };
 
   const handleDelete = async (mediaId) => {
     Alert.alert(
@@ -421,8 +503,16 @@ const uploadSingleImage = async (file, attempt = 1) => {
           style: "destructive",
           onPress: async () => {
             try {
-              await apiRequest("delete", `/vendor-profile/media/${mediaId}`);
+              const token = await getAuthToken();
+              await axios({
+                method: 'DELETE',
+                url: `${BASE_URL}/vendor-profile/media/${mediaId}`,
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                },
+              });
               await fetchMedia();
+              Alert.alert("Success", "Media deleted successfully");
             } catch (error) {
               console.error("Delete error:", error);
               Alert.alert("Error", "Failed to delete media");
@@ -435,9 +525,17 @@ const uploadSingleImage = async (file, attempt = 1) => {
 
   const handleToggleVisibility = async (mediaId) => {
     try {
-      const response = await apiRequest("patch", `/vendor-profile/media/${mediaId}/toggle-visibility`);
-      if (response.success) {
-        setMedia(media.map((m) => (m._id === mediaId ? response.data : m)));
+      const token = await getAuthToken();
+      const response = await axios({
+        method: 'PATCH',
+        url: `${BASE_URL}/vendor-profile/media/${mediaId}/toggle-visibility`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (response.data.success) {
+        setMedia(media.map((m) => (m._id === mediaId ? response.data.data : m)));
+        Alert.alert("Success", `Visibility updated to ${response.data.data.visibility}`);
       }
     } catch (error) {
       console.error("Toggle visibility error:", error);
@@ -447,9 +545,17 @@ const uploadSingleImage = async (file, attempt = 1) => {
 
   const handleToggleFeatured = async (mediaId) => {
     try {
-      const response = await apiRequest("patch", `/vendor-profile/media/${mediaId}/feature`);
-      if (response.success) {
-        setMedia(media.map((m) => (m._id === mediaId ? response.data : m)));
+      const token = await getAuthToken();
+      const response = await axios({
+        method: 'PATCH',
+        url: `${BASE_URL}/vendor-profile/media/${mediaId}/feature`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (response.data.success) {
+        setMedia(media.map((m) => (m._id === mediaId ? response.data.data : m)));
+        Alert.alert("Success", response.data.data.isFeatured ? "Marked as featured" : "Removed from featured");
       }
     } catch (error) {
       console.error("Toggle featured error:", error);
@@ -617,8 +723,6 @@ const uploadSingleImage = async (file, attempt = 1) => {
 
   return (
     <View style={styles.container}>
-
-
       {/* Plan Card */}
       {limits && (
         <View
@@ -763,32 +867,11 @@ const uploadSingleImage = async (file, attempt = 1) => {
   );
 };
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFF",
   },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 5,
-  },
-
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#7c3aed",
-    marginLeft: 16,
-  },
-
   planCard: {
     margin: 16,
     padding: 16,
@@ -798,75 +881,62 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-
   unlimitedPlanCard: {
     backgroundColor: "#f5f3ff",
     borderWidth: 2,
     borderColor: "#c4b5fd",
   },
-
   limitReachedPlanCard: {
     backgroundColor: "#fef2f2",
     borderWidth: 2,
     borderColor: "#fecaca",
   },
-
   lowLimitPlanCard: {
     backgroundColor: "#fffbeb",
     borderWidth: 2,
     borderColor: "#fed7aa",
   },
-
   normalPlanCard: {
     backgroundColor: "#eff6ff",
     borderWidth: 2,
     borderColor: "#bfdbfe",
   },
-
   planInfo: {
     flex: 1,
   },
-
   planText: {
     fontSize: 16,
     fontWeight: "700",
     marginBottom: 4,
   },
-
   usageText: {
     fontSize: 13,
     color: "#6b7280",
     marginBottom: 4,
   },
-
   boldText: {
     fontWeight: "700",
     color: "#374151",
   },
-
   remainingText: {
     color: "#059669",
   },
-
   infoText: {
     fontSize: 11,
     color: "#6b7280",
     marginTop: 4,
   },
-
   upgradeButton: {
     backgroundColor: "#7c3aed",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
   },
-
   upgradeButtonText: {
     color: "#fff",
     fontWeight: "600",
     fontSize: 12,
   },
-
   galleryCard: {
     backgroundColor: "#ffffff",
     margin: 16,
@@ -881,26 +951,22 @@ const styles = StyleSheet.create({
     elevation: 4,
     flex: 1,
   },
-
   galleryHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 12,
   },
-
   galleryTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: "#1f2937",
   },
-
   galleryCount: {
     color: "#8E8E93",
     fontSize: 12,
     marginTop: 2,
   },
-
   uploadButton: {
     backgroundColor: "#7C3AED",
     flexDirection: "row",
@@ -909,18 +975,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 10,
   },
-
   uploadButtonDisabled: {
     backgroundColor: "#d1d5db",
   },
-
   uploadText: {
     color: "#fff",
     marginLeft: 8,
     fontWeight: "600",
     fontSize: 13,
   },
-
   tipContainer: {
     flexDirection: "row",
     backgroundColor: "#EFF6FF",
@@ -929,7 +992,6 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 16,
   },
-
   tipText: {
     marginLeft: 8,
     color: "#2563EB",
@@ -937,27 +999,22 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 18,
   },
-
   loadingContainer: {
-  flex: 1,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#ffff',
   },
-
   loadingText: {
     marginTop: 12,
     color: "#6b7280",
   },
-
   columnWrapper: {
     justifyContent: "space-between",
   },
-
   gridContainer: {
     paddingBottom: 20,
   },
-
   imageWrapper: {
     width: "48%",
     marginBottom: 16,
@@ -967,43 +1024,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e5e7eb",
   },
-
   galleryImage: {
     width: "100%",
     height: 150,
     backgroundColor: "#f3f4f6",
   },
-
   statusContainer: {
     position: "absolute",
     top: 8,
     left: 8,
   },
-
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
-
   statusApproved: {
     backgroundColor: "#10b981",
   },
-
   statusRejected: {
     backgroundColor: "#ef4444",
   },
-
   statusPending: {
     backgroundColor: "#f59e0b",
   },
-
   statusText: {
     color: "#fff",
     fontSize: 10,
     fontWeight: "600",
   },
-
   featuredBadge: {
     position: "absolute",
     top: 8,
@@ -1016,14 +1065,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
-
   featuredText: {
     color: "#fff",
     fontSize: 10,
     fontWeight: "600",
     marginLeft: 4,
   },
-
   hiddenBadge: {
     position: "absolute",
     bottom: 8,
@@ -1036,38 +1083,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
-
   hiddenText: {
     color: "#fff",
     fontSize: 10,
     fontWeight: "600",
     marginLeft: 4,
   },
-
   imageInfo: {
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#f3f4f6",
   },
-
   imageCaption: {
     fontSize: 12,
     fontWeight: "600",
     color: "#374151",
   },
-
   imageSize: {
     fontSize: 10,
     color: "#9ca3af",
     marginTop: 2,
   },
-
   actionButtons: {
     flexDirection: "column",
     padding: 8,
     gap: 6,
   },
-
   viewButton: {
     flex: 1,
     flexDirection: "row",
@@ -1078,13 +1119,11 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     gap: 4,
   },
-
   viewButtonText: {
     fontSize: 11,
     fontWeight: "500",
     color: "#4f46e5",
   },
-
   visibilityButton: {
     flex: 1,
     flexDirection: "row",
@@ -1094,39 +1133,32 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     gap: 4,
   },
-
   publicButton: {
     backgroundColor: "#d1fae5",
   },
-
   hiddenButton: {
     backgroundColor: "#f3f4f6",
   },
-
   visibilityButtonText: {
     fontSize: 11,
     fontWeight: "500",
   },
-
   publicText: {
     color: "#059669",
   },
-
   hiddenButtonText: {
     color: "#6b7280",
   },
-
   deleteButton: {
     backgroundColor: "#fee2e2",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
-    flexDirection : 'row',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
   },
-
   featuredButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1138,27 +1170,22 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     gap: 6,
   },
-
   featuredButtonActive: {
     backgroundColor: "#fef3c7",
   },
-
   featuredButtonText: {
     fontSize: 11,
     fontWeight: "500",
     color: "#6b7280",
   },
-
   featuredButtonTextActive: {
     color: "#f59e0b",
   },
-
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 40,
   },
-
   emptyTitle: {
     fontSize: 18,
     fontWeight: "600",
@@ -1166,7 +1193,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
-
   emptyText: {
     fontSize: 14,
     color: "#6b7280",
@@ -1174,7 +1200,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     paddingHorizontal: 32,
   },
-
   emptyUploadButton: {
     backgroundColor: "#7c3aed",
     flexDirection: "row",
@@ -1183,27 +1208,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 10,
   },
-
   emptyUploadText: {
     color: "#fff",
     marginLeft: 8,
     fontWeight: "600",
   },
-
   modalContainer: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.9)",
     justifyContent: "center",
     alignItems: "center",
   },
-
   modalContent: {
     width: "100%",
     height: "100%",
     justifyContent: "center",
     alignItems: "center",
   },
-
   closeButton: {
     position: "absolute",
     top: 40,
@@ -1213,7 +1234,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 8,
   },
-
   modalImage: {
     width: "100%",
     height: "80%",

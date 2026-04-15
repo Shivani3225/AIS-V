@@ -16,7 +16,7 @@ import axios from 'axios';
 
 const { width, height } = Dimensions.get('window');
 
-const BASE_URL = 'https://my-backend-dnj5.onrender.com/api';
+const BASE_URL = 'https://api.aissignatureevent.com/api';
 
 const ForgotPassword = () => {
   const navigation = useNavigation();
