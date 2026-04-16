@@ -11,11 +11,14 @@ import {
   SafeAreaView
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+
 const SplashScreen = () => {
   const navigation = useNavigation();
+  
   const handleGetStarted = () => {
-    console.log('Get Started pressed');
+    navigation.navigate('Login');
   };
+  
   useEffect(() => {
     // Automatic navigation after 3 seconds
     const timer = setTimeout(() => {
@@ -26,18 +29,19 @@ const SplashScreen = () => {
     return () => clearTimeout(timer);
   }, [navigation]);
 
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#ffff" barStyle="dark-content" />
-
 
       {/* Main Content */}
       <View style={styles.contentContainer}>
         {/* AIS Logo - Circular and Big */}
         <View style={styles.logoWrapper}>
           <View style={styles.logoCircle}>
-            <Image source={require('../assets/Logo.png')} style={{ width: '100%', height: '100%', resizeMode: 'contain' }} />
+            <Image 
+              source={require('../assets/Logo.png')} 
+              style={{ width: '100%', height: '100%', resizeMode: 'contain' }} 
+            />
           </View>
         </View>
 
@@ -51,7 +55,7 @@ const SplashScreen = () => {
           Discover exciting events happening near you invite others to join.
         </Text>
 
-        {/* Get Started Button - Blue Color */}
+        {/* Get Started Button - Navy Blue Color */}
         <TouchableOpacity
           style={styles.getStartedButton}
           onPress={handleGetStarted}
@@ -67,14 +71,12 @@ const SplashScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    //backgroundColor: '#f9efef', // White background
     backgroundColor: '#F3F0FF'
   },
   timeContainer: {
     paddingHorizontal: 24,
     paddingTop: 12,
   },
-
   contentContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -86,19 +88,19 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   logoCircle: {
-    width: 160, // Big size
-    height: 160, // Big size
-    borderRadius: 80, // Half of width/height for perfect circle
+    width: 160,
+    height: 160,
+    borderRadius: 80,
   },
   logoText: {
-    fontSize: 48, // Big font
+    fontSize: 48,
     fontWeight: 'bold',
-    color: '#f3f0f0', // Dark grey color for AIS text
+    color: '#f3f0f0',
   },
   mainHeading: {
-    fontSize: 30, // Big fonts
+    fontSize: 30,
     fontWeight: '800',
-    color: '#000000', // Black color
+    color: '#000000',
     textAlign: 'center',
     marginBottom: 15,
     letterSpacing: 0.5,
@@ -106,20 +108,20 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
-    color: '#727272', // Grey color
+    color: '#727272',
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 40,
     paddingHorizontal: 20,
   },
   getStartedButton: {
-    backgroundColor: '#2929e6', // Blue color
+    backgroundColor: '#1f1f6b', // Navy blue color
     paddingVertical: 18,
     paddingHorizontal: 50,
     borderRadius: 30,
     width: '100%',
     alignItems: 'center',
-    shadowColor: '#0066FF',
+    shadowColor: '#1f1f6b',
     shadowOffset: {
       width: 0,
       height: 4,
@@ -129,7 +131,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   getStartedText: {
-    color: '#FFFFFF', // White text
+    color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '600',
     letterSpacing: 0.5,
