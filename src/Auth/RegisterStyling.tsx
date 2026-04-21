@@ -477,6 +477,7 @@ addTimingText: {
     color: '#374151',
     marginTop: 16,
     marginBottom: 6,
+    
   },
 
   inputBox: {
@@ -561,7 +562,8 @@ dropdownBox: {
   borderColor: '#E5E7EB',
   borderRadius: 8,
   paddingHorizontal: 12,
-  backgroundColor: '#F9FAFB',
+  //marginHorizontal: 16,
+  backgroundColor: '#dedbdb',
   height: 48,
   marginTop: 6,
 },
@@ -577,9 +579,9 @@ placeholderText: {
 },
 
 textAreaBox: {
-  minHeight: 60,
+  minHeight: 50,
   alignItems: 'flex-start',
-  paddingTop: 12,
+ // paddingTop: 12,
 },
 
 textAreaIcon: {
@@ -598,12 +600,24 @@ inputBox: {
   borderWidth: 1,
   borderColor: '#E5E7EB',
   borderRadius: 8,
-  paddingHorizontal: 12,
+  paddingHorizontal: 10,
+  
   backgroundColor: '#F9FAFB',
-  marginTop: 6,
-  height: 48,
+  marginTop: 8,
+  height: 45,
 },
-
+pincodebox:{
+   flexDirection: 'row',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 8,
+  paddingHorizontal: 10,
+  backgroundColor: '#F9FAFB',
+  marginTop: 10,
+  height: 45,
+  marginHorizontal: 10,  
+},
 input: {
   flex: 1,
   fontSize: 14,
@@ -812,11 +826,7 @@ input: {
   fontSize: 15
 },
 
-helperText: {
-  fontSize: 12,
-  color: "#6B7280",
- 
-},
+
 
 stepSubtitle: {
   fontSize: 14,
@@ -951,14 +961,15 @@ modalHomeLinkText: {
 dropdownBox: {
   marginTop: 10,
   borderWidth: 1,
-  borderColor: "#D1D5DB",
+  borderColor: '#E5E7EB',
   borderRadius: 8,
   paddingHorizontal: 12,
+ // marginHorizontal: 10,
   height: 46,
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "space-between",
-  backgroundColor: "#FFFFFF"
+ backgroundColor: '#F9FAFB',
 },
 
 dropdownText: {
@@ -1001,15 +1012,22 @@ descriptionInput: {
 
 descriptionFooter: {
   flexDirection: "row",
-  justifyContent: "space-between",
+  justifyContent: "flex-start",  // Change from "space-between" to "flex-start"
   alignItems: "center",
-  marginTop: 6
+  marginTop: 6,
+  flexWrap: "wrap",  // Add this to prevent text from going outside
+},
+
+helperText: {
+  fontSize: 13,
+  color: "#6B7280",
+  marginRight: 10,  // Add space between helper text and counter text
 },
 
 counterText: {
   fontSize: 12,
   color: "#9CA3AF",
- marginTop:20,
+  textAlign: 'left',
 },
 importantBox: {
   marginTop: 20,
@@ -1569,10 +1587,9 @@ modalOverlay: {
     left: 0,
     right: 0,
     zIndex: 1000,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
+    backgroundColor: '#ffff',
+   
+    borderRadius: 10,
     maxHeight: 250,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1585,8 +1602,8 @@ modalOverlay: {
     alignItems: 'center',
     padding: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
+    borderBottomColor: '#c6c6c7',
+    backgroundColor: '#ffff',
   },
   citySearchInput: {
     flex: 1,
@@ -1608,7 +1625,7 @@ modalOverlay: {
     borderBottomColor: '#F3F4F6',
   },
   selectedCityItem: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#828282',
   },
   cityName: {
     fontSize: 14,
@@ -1796,6 +1813,21 @@ modalOverlay: {
     backgroundColor: '#F3F4F6',
     marginLeft: 8,
   },
+  paymentReminderBox: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#FEF3C7',
+  padding: 12,
+  borderRadius: 10,
+  marginVertical: 10,
+  gap: 10,
+},
+paymentReminderText: {
+  flex: 1,
+  fontSize: 13,
+  color: '#92400E',
+  lineHeight: 18,
+},
 
 
 });

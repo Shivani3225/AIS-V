@@ -1,5 +1,9 @@
 
 
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -27,7 +31,81 @@ import RazorpayCheckout from 'react-native-razorpay';
 
 const API_BASE_URL = 'https://api.aissignatureevent.com/api';
 
-// ============= TIME PICKER MODAL COMPONENT (Moved outside) =============
+// ============= CUSTOM TOAST COMPONENT =============
+const Toast = ({ visible, message, type, onHide }) => {
+  useEffect(() => {
+    if (visible) {
+      const timer = setTimeout(() => {
+        onHide();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [visible, onHide]);
+
+  if (!visible) return null;
+
+  const getBackgroundColor = () => {
+    switch (type) {
+      case 'success': return '#10B981';
+      case 'error': return '#EF4444';
+      case 'warning': return '#F59E0B';
+      default: return '#3B82F6';
+    }
+  };
+
+  const getIcon = () => {
+    switch (type) {
+      case 'success': return 'check-circle';
+      case 'error': return 'alert-circle';
+      case 'warning': return 'alert-triangle';
+      default: return 'info';
+    }
+  };
+
+  return (
+    <Modal transparent visible={visible} animationType="fade">
+      <View style={toastStyles.overlay}>
+        <View style={[toastStyles.container, { backgroundColor: getBackgroundColor() }]}>
+          <FeatherIcon name={getIcon()} size={20} color="#FFFFFF" />
+          <Text style={toastStyles.message}>{message}</Text>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const toastStyles = StyleSheet.create({
+  overlay: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginHorizontal: 20,
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  message: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+});
+
+// ============= TIME PICKER MODAL COMPONENT =============
 const TimePickerModal = ({ visible, onClose, onConfirm, currentTime, title }) => {
   const [selectedHour, setSelectedHour] = useState('09');
   const [selectedMinute, setSelectedMinute] = useState('00');
@@ -170,6 +248,9 @@ const VendorRegistration = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [registrationResponse, setRegistrationResponse] = useState(null);
   const [apiError, setApiError] = useState('');
+  
+  // Toast State
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'info' });
 
   // Subscription States
   const [vendorToken, setVendorToken] = useState(null);
@@ -251,6 +332,11 @@ const VendorRegistration = () => {
     totalBookings: 0,
   });
 
+  // ============= HELPER FUNCTIONS =============
+  const showToast = (message, type = 'info') => {
+    setToast({ visible: true, message, type });
+  };
+
   // ============= STEPS CONFIGURATION =============
   const steps = [
     { id: 1, title: 'Category', icon: 'grid' },
@@ -318,7 +404,6 @@ const VendorRegistration = () => {
 
   // ============= SUBSCRIPTION PLAN API FUNCTIONS =============
 
-  // Get token from AsyncStorage
   const getToken = async () => {
     try {
       const authToken = await AsyncStorage.getItem('authToken');
@@ -335,7 +420,6 @@ const VendorRegistration = () => {
     }
   };
 
-  // Load subscription status
   const loadSubscription = async () => {
     if (!vendorToken) {
       setApiError('Authentication required');
@@ -363,7 +447,6 @@ const VendorRegistration = () => {
     }
   };
 
-  // Cancel order if payment fails or user closes modal
   const cancelOrder = async (orderId) => {
     if (!orderId) return;
     
@@ -382,7 +465,6 @@ const VendorRegistration = () => {
     }
   };
 
-  // Mark Payment as Failed
   const markPaymentFailed = async (orderId, paymentId, errorDetails) => {
     try {
       await axios.post(`${API_BASE_URL}/subscription/mark-failed`, {
@@ -400,7 +482,6 @@ const VendorRegistration = () => {
     }
   };
 
-  // Verify payment after successful transaction
   const verifyPayment = async (paymentResponse, planKey, orderId) => {
     try {
       const response = await fetch(`${API_BASE_URL}/subscription/verify-payment`, {
@@ -423,19 +504,12 @@ const VendorRegistration = () => {
         setShowPlanModal(false);
         await loadSubscription();
         
-        // Check if plan was queued or instantly activated
         if (data.queued && data.upcomingPlan) {
-          Alert.alert(
-            'Success!',
-            `🎉 ${data.upcomingPlan.planName} purchased! It will activate on ${new Date(data.upcomingPlan.scheduledStartDate).toLocaleDateString('en-IN')} when your current plan expires.`
-          );
+          showToast(`🎉 ${data.upcomingPlan.planName} purchased! It will activate on ${new Date(data.upcomingPlan.scheduledStartDate).toLocaleDateString('en-IN')}`, 'success');
         } else {
-          Alert.alert(
-            'Success!',
-            data.hasBonus
-              ? `🎉 ${data.subscription.planName} activated! You got 30 days FREE bonus — ${data.totalDays} days total.`
-              : `✅ ${data.subscription.planName} activated for ${data.totalDays} days.`
-          );
+          showToast(data.hasBonus
+            ? `🎉 ${data.subscription.planName} activated! You got 30 days FREE bonus — ${data.totalDays} days total.`
+            : `✅ ${data.subscription.planName} activated for ${data.totalDays} days.`, 'success');
         }
         setCurrentOrderId(null);
       } else {
@@ -444,16 +518,15 @@ const VendorRegistration = () => {
     } catch (err) {
       console.error('Verification error:', err);
       setApiError(err.message || 'Failed to verify payment');
-      Alert.alert('Error', err.message || 'Failed to verify payment. Please contact support with your payment ID if amount was deducted.');
+      showToast(err.message || 'Failed to verify payment. Please contact support.', 'error');
     } finally {
       setPurchasing(false);
     }
   };
 
-  // Initiate payment for subscription
   const initiatePayment = async (planKey) => {
     if (!vendorToken) {
-      Alert.alert('Error', 'Please login again to continue');
+      showToast('Please login again to continue', 'error');
       return;
     }
 
@@ -463,7 +536,6 @@ const VendorRegistration = () => {
     try {
       console.log('1. Creating order:', planKey);
 
-      // Create order with backend
       const response = await fetch(`${API_BASE_URL}/subscription/purchase`, {
         method: 'POST',
         headers: {
@@ -488,9 +560,8 @@ const VendorRegistration = () => {
 
       setCurrentOrderId(data.orderId);
 
-      // Razorpay checkout options
       const options = {
-        key: 'rzp_live_SQbIdkWnB4MDHg', // Replace with your actual Razorpay key
+        key: 'rzp_live_SQbIdkWnB4MDHg',
         amount: amountInPaise,
         currency: 'INR',
         name: 'AIS Signature',
@@ -528,7 +599,6 @@ const VendorRegistration = () => {
 
       console.log('3. Opening Razorpay');
 
-      // Open Razorpay checkout
       RazorpayCheckout.open(options)
         .then(async (paymentResponse) => {
           console.log('4. Payment success:', paymentResponse);
@@ -540,18 +610,17 @@ const VendorRegistration = () => {
 
           if (currentOrderId) cancelOrder(currentOrderId);
           
-          Alert.alert('Payment Failed', error?.description || error?.message || 'Payment failed. Please try again.');
+          showToast(error?.description || error?.message || 'Payment failed. Please try again.', 'error');
         });
 
     } catch (err) {
       console.log('Error:', err);
       setApiError(err.message);
       setPurchasing(false);
-      Alert.alert('Error', err.message);
+      showToast(err.message, 'error');
     }
   };
 
-  // Purchase handler
   const handlePurchase = (planKey) => {
     initiatePayment(planKey);
   };
@@ -562,14 +631,12 @@ const VendorRegistration = () => {
     getToken();
   }, []);
 
-  // Load subscription after token is available
   useEffect(() => {
     if (vendorToken) {
       loadSubscription();
     }
   }, [vendorToken]);
 
-  // Filter categories when search changes
   useEffect(() => {
     if (categorySearch.trim()) {
       const filtered = categories.filter(cat => 
@@ -582,7 +649,6 @@ const VendorRegistration = () => {
     }
   }, [categorySearch, categories]);
 
-  // Filter cities when search changes
   useEffect(() => {
     if (citySearch.trim() && citySearch.length >= 2) {
       searchCities(citySearch);
@@ -591,7 +657,6 @@ const VendorRegistration = () => {
     }
   }, [citySearch]);
 
-  // Load initial data (categories only)
   const loadInitialData = async () => {
     setLoadingData(true);
     try {
@@ -621,10 +686,7 @@ const VendorRegistration = () => {
     } catch (error) {
       console.error('❌ Failed to load categories:', error);
       
-      Alert.alert(
-        'Connection Error', 
-        'Could not connect to server. Using offline data.'
-      );
+      showToast('Could not connect to server. Using offline data.', 'warning');
       
       setCategories([
         { id: '1', name: 'Photographer', icon: '📸', category: 'Photography' },
@@ -646,7 +708,6 @@ const VendorRegistration = () => {
     }
   };
 
-  // Search cities API
   const searchCities = async (query) => {
     if (query.length < 2) return;
     
@@ -674,8 +735,6 @@ const VendorRegistration = () => {
     }
   };
 
-  // ============= HELPER FUNCTIONS =============
-
   const getPlanId = (planName) => {
     const planNameMap = {
       'Free': 'free',
@@ -686,7 +745,6 @@ const VendorRegistration = () => {
     return planNameMap[planName] || 'free';
   };
 
-  // Category Handlers
   const handleCategorySelect = (category) => {
     setSelectedCategory(category.name);
     setSelectedCategoryId(category.id);
@@ -707,7 +765,6 @@ const VendorRegistration = () => {
     }
   };
 
-  // City Handlers
   const handleCitySelect = (city) => {
     setFormData({ 
       ...formData, 
@@ -719,7 +776,6 @@ const VendorRegistration = () => {
     setShowBusinessError(false);
   };
 
-  // Timing Handlers
   const handleDayToggle = (day) => {
     setSelectedDays(prev => {
       if (prev.includes(day)) {
@@ -731,7 +787,6 @@ const VendorRegistration = () => {
     setShowTimingError(false);
   };
 
-  // Photo Handlers
   const openGallery = () => {
     const options = {
       mediaType: 'photo',
@@ -777,21 +832,17 @@ const VendorRegistration = () => {
     setFormData({ ...formData, photos: updatedPhotos });
   };
 
-  // Pricing Handler
   const handlePricingSelect = (pricing) => {
     setSelectedPricing(pricing);
     setFormData({ ...formData, pricing: pricing });
   };
 
-  // Plan Handler
   const handlePlanSelect = (plan) => {
     setSelectedPlan(plan);
     setFormData({ ...formData, plan: plan });
   };
 
-  // ============= API INTEGRATION =============
   const prepareVendorData = () => {
-    // Get minPrice and maxPrice from state variables
     const minPriceNum = minPrice ? parseFloat(minPrice) : 0;
     const maxPriceNum = maxPrice ? parseFloat(maxPrice) : 0;
     const averagePrice = (minPriceNum + maxPriceNum) / 2;
@@ -799,7 +850,6 @@ const VendorRegistration = () => {
     
     const descriptionValue = formData.description || description || '';
     
-    // Format business hours for backend
     const businessHours = {
       workingDays: selectedDays,
       openingTime: openingTime,
@@ -842,9 +892,7 @@ const VendorRegistration = () => {
       pincode: pincodeValue,
       address: cleanAddress,
       landmark: formData.landmark || '',
-      // BUSINESS HOURS - Added fix
       businessHours: businessHours,
-      // Also include timing field for backward compatibility
       timing: `${openingTime} - ${closingTime} (${selectedDays.join(', ')})`,
       pricing: {
         min: minPriceNum,
@@ -879,34 +927,9 @@ const VendorRegistration = () => {
       portfolio: []
     };
     
-    console.log('========== BUSINESS HOURS DEBUG ==========');
-    console.log('Working Days:', selectedDays);
-    console.log('Opening Time:', openingTime);
-    console.log('Closing Time:', closingTime);
-    console.log('==========================================');
-    
-    console.log('========== PRICING DATA DEBUG ==========');
-    console.log('Min Price:', minPriceNum);
-    console.log('Max Price:', maxPriceNum);
-    console.log('Average Price:', Math.floor(averagePrice));
-    console.log('Price Unit:', priceUnitValue);
-    console.log('========================================');
-    
-    console.log('========== LOCATION DATA DEBUG ==========');
-    console.log('City:', cityName);
-    console.log('Area:', areaName);
-    console.log('Pincode:', pincodeValue);
-    console.log('Address (simplified):', cleanAddress);
-    console.log('========================================');
-    
-    console.log('========== FULL VENDOR DATA ==========');
-    console.log(JSON.stringify(vendorData, null, 2));
-    console.log('========================================');
-    
     return vendorData;
   };
 
-  // Register Vendor with Payment Integration
   const registerVendor = async () => {
     try {
       const vendorData = prepareVendorData();
@@ -916,12 +939,10 @@ const VendorRegistration = () => {
         throw new Error('Contact email is missing from registration data');
       }
       
-      // For paid plans, create order first
       if (selectedPlan !== 'Free') {
         return await handlePaidPlanRegistration(vendorData);
       }
       
-      // For free plan, direct registration
       const response = await axios.post(
         `${API_BASE_URL}/vendors/register`,
         vendorData,
@@ -964,85 +985,258 @@ const VendorRegistration = () => {
     }
   };
 
-  // Handle Paid Plan Registration (with Razorpay)
   const handlePaidPlanRegistration = async (vendorData) => {
-    try {
-      // Step 1: Create order
-      const orderResponse = await axios.post(`${API_BASE_URL}/subscription/create`, {
-        planKey: getPlanId(selectedPlan),
-        vendorData: vendorData
-      });
+    return new Promise(async (resolve, reject) => {
+      try {
+        const orderResponse = await axios.post(`${API_BASE_URL}/subscription/create`, {
+          planKey: getPlanId(selectedPlan),
+          vendorData: vendorData
+        });
 
-      const orderData = orderResponse.data;
+        const orderData = orderResponse.data;
 
-      if (!orderData.success) {
-        throw new Error(orderData.message || 'Failed to create order');
-      }
-
-      // Step 2: Open Razorpay checkout
-      const options = {
-        key: 'rzp_live_SQbIdkWnB4MDHg', // Replace with your actual key
-        amount: orderData.amount,
-        currency: orderData.currency,
-        order_id: orderData.orderId,
-        name: 'AIS Signature',
-        description: `${selectedPlan} Plan - ₹${orderData.planPrice}/30 days`,
-        handler: async (paymentResponse) => {
-          // Step 3: Complete registration after payment
-          await completePaidPlanRegistration(paymentResponse, vendorData);
-        },
-        prefill: {
-          name: formData.contactName,
-          email: formData.email,
-          contact: formData.phone
-        },
-        notes: {
-          plan: selectedPlan,
-          duration: '30 days'
-        },
-        theme: {
-          color: '#5B5BEA'
-        },
-        modal: {
-          ondismiss: () => {
-            setIsSubmitting(false);
-            Alert.alert('Payment Cancelled', 'You cancelled the payment. Please try again.');
-            cancelOrder(orderData.orderId);
-          }
+        if (!orderData.success) {
+          throw new Error(orderData.message || 'Failed to create order');
         }
-      };
 
-      // Check if Razorpay is available
-      if (RazorpayCheckout) {
+        const currentOrderIdValue = orderData.orderId;
+
+        const options = {
+          key: 'rzp_live_SQbIdkWnB4MDHg',
+          amount: orderData.amount,
+          currency: orderData.currency,
+          order_id: currentOrderIdValue,
+          name: 'AIS Signature',
+          description: `${selectedPlan} Plan Registration`,
+          prefill: {
+            name: formData.contactName,
+            email: formData.email,
+            contact: formData.phone
+          },
+          notes: {
+            plan: selectedPlan,
+            type: 'vendor_registration'
+          },
+          theme: {
+            color: '#5B5BEA'
+          },
+          modal: {
+            ondismiss: async () => {
+              console.log(`Payment cancelled by user, registering with ${selectedPlan} plan...`);
+              
+              try {
+                const paidPlanData = {
+                  ...vendorData,
+                  subscription: {
+                    planKey: getPlanId(selectedPlan),
+                    planName: selectedPlan.toLowerCase(),
+                    paymentStatus: 'cancelled',
+                    paymentId: null,
+                    orderId: currentOrderIdValue,
+                    notes: `User cancelled payment during registration, but registered with ${selectedPlan} plan`,
+                    status: 'pending_payment'
+                  }
+                };
+                
+                const registerResponse = await axios.post(
+                  `${API_BASE_URL}/vendors/register`,
+                  paidPlanData,
+                  {
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Accept': 'application/json',
+                    },
+                    timeout: 30000,
+                  }
+                );
+                
+                console.log(`${selectedPlan} plan registration response (cancelled payment):`, registerResponse.data);
+                
+                try {
+                  await axios.post(`${API_BASE_URL}/subscription/cancel-order`, {
+                    orderId: currentOrderIdValue
+                  });
+                } catch (err) {
+                  console.log('Error cancelling order:', err);
+                }
+                
+                showToast(`Your account has been created with the ${selectedPlan} plan! Payment was not completed.`, 'warning');
+                
+                resolve(registerResponse.data);
+                
+              } catch (registerError) {
+                console.error('Registration failed after cancellation:', registerError);
+                reject(registerError);
+              } finally {
+                setIsSubmitting(false);
+              }
+            }
+          }
+        };
+
         RazorpayCheckout.open(options)
           .then(async (paymentResponse) => {
-            console.log('Payment success:', paymentResponse);
-            await completePaidPlanRegistration(paymentResponse, vendorData);
+            console.log(`Payment successful, completing registration with ${selectedPlan} plan...`);
+            
+            try {
+              const registerResponse = await axios.post(`${API_BASE_URL}/subscription/complete-registration`, {
+                razorpay_payment_id: paymentResponse.razorpay_payment_id,
+                razorpay_order_id: paymentResponse.razorpay_order_id,
+                razorpay_signature: paymentResponse.razorpay_signature,
+                vendorData: {
+                  ...vendorData,
+                  subscription: {
+                    planKey: getPlanId(selectedPlan),
+                    planName: selectedPlan.toLowerCase(),
+                    paymentId: paymentResponse.razorpay_payment_id,
+                    orderId: paymentResponse.razorpay_order_id,
+                    paymentStatus: 'success',
+                    paymentDate: new Date().toISOString(),
+                    status: 'active'
+                  }
+                }
+              });
+
+              const data = registerResponse.data;
+
+              if (!data.success) {
+                throw new Error(data.message || 'Registration verification failed');
+              }
+
+              console.log(`${selectedPlan} plan registration response (payment success):`, data);
+
+              showToast(`Your account has been created with the ${selectedPlan} plan! Payment successful.`, 'success');
+
+              resolve(data);
+              
+            } catch (registerError) {
+              console.error('Registration failed after payment:', registerError);
+              
+              try {
+                const fallbackResponse = await axios.post(
+                  `${API_BASE_URL}/vendors/register`,
+                  {
+                    ...vendorData,
+                    subscription: {
+                      planKey: getPlanId(selectedPlan),
+                      planName: selectedPlan.toLowerCase(),
+                      paymentStatus: 'payment_success_but_registration_failed',
+                      paymentId: paymentResponse.razorpay_payment_id,
+                      notes: 'Payment succeeded but registration had error, contact support',
+                      status: 'pending_verification'
+                    }
+                  }
+                );
+                
+                showToast(`Payment successful but there was an issue. Account created with ${selectedPlan} plan.`, 'warning');
+                
+                resolve(fallbackResponse.data);
+              } catch (fallbackError) {
+                reject(registerError);
+              }
+            }
           })
-          .catch((error) => {
-            console.error('Payment failed:', error);
-            Alert.alert('Payment Failed', error.description || 'Payment failed. Please try again.');
+          .catch(async (error) => {
+            console.error(`Payment failed, registering with ${selectedPlan} plan...`);
             
-            const failedOrderId = orderData.orderId;
-            markPaymentFailed(failedOrderId, null, {
-              code: error.code,
-              description: error.description,
-              source: 'razorpay'
-            });
-            
-            setIsSubmitting(false);
+            try {
+              try {
+                await axios.post(`${API_BASE_URL}/subscription/mark-payment-failed`, {
+                  orderId: currentOrderIdValue,
+                  error: {
+                    code: error.code,
+                    description: error.description,
+                    source: 'razorpay'
+                  }
+                });
+              } catch (err) {
+                console.log('Error marking payment failed:', err);
+              }
+              
+              const paidPlanData = {
+                ...vendorData,
+                subscription: {
+                  planKey: getPlanId(selectedPlan),
+                  planName: selectedPlan.toLowerCase(),
+                  paymentStatus: 'failed',
+                  paymentId: null,
+                  orderId: currentOrderIdValue,
+                  errorDetails: {
+                    code: error.code,
+                    description: error.description
+                  },
+                  notes: `Payment failed during registration, but registered with ${selectedPlan} plan`,
+                  status: 'pending_payment'
+                }
+              };
+              
+              const registerResponse = await axios.post(
+                `${API_BASE_URL}/vendors/register`,
+                paidPlanData,
+                {
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                  },
+                  timeout: 30000,
+                }
+              );
+              
+              console.log(`${selectedPlan} plan registration response (payment failed):`, registerResponse.data);
+              
+              showToast(`Your account has been created with the ${selectedPlan} plan! Payment was not successful.`, 'warning');
+              
+              resolve(registerResponse.data);
+              
+            } catch (registerError) {
+              console.error('Registration failed after payment error:', registerError);
+              reject(registerError);
+            } finally {
+              setIsSubmitting(false);
+            }
           });
-      } else {
-        throw new Error('Razorpay SDK not loaded');
+          
+      } catch (error) {
+        console.error('Order creation error:', error);
+        setIsSubmitting(false);
+        
+        try {
+          const fallbackData = {
+            ...vendorData,
+            subscription: {
+              planKey: getPlanId(selectedPlan),
+              planName: selectedPlan.toLowerCase(),
+              paymentStatus: 'order_creation_failed',
+              notes: `Order creation failed, registered with ${selectedPlan} plan`,
+              status: 'pending_payment'
+            }
+          };
+          
+          const fallbackResponse = await axios.post(
+            `${API_BASE_URL}/vendors/register`,
+            fallbackData,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              timeout: 30000,
+            }
+          );
+          
+          console.log(`${selectedPlan} plan registration response (order creation failed):`, fallbackResponse.data);
+          
+          showToast(`Your account has been created with the ${selectedPlan} plan!`, 'success');
+          
+          resolve(fallbackResponse.data);
+        } catch (fallbackError) {
+          showToast(error.message || 'Failed to initialize payment. Please try again.', 'error');
+          reject(error);
+        }
       }
-      
-    } catch (error) {
-      console.error('Payment initialization error:', error);
-      throw error;
-    }
+    });
   };
 
-  // Complete registration after successful payment
   const completePaidPlanRegistration = async (paymentResponse, vendorData) => {
     try {
       const response = await axios.post(`${API_BASE_URL}/subscription/complete-registration`, {
@@ -1072,52 +1266,50 @@ const VendorRegistration = () => {
     }
   };
 
-  // ============= VALIDATION FUNCTION =============
   const validateStep = () => {
     if (currentStep === 1) {
       if (!selectedCategory && !manualCategory) {
         setShowError(true);
-        Alert.alert('Validation Error', 'Please select or enter a business category');
+        showToast('Please select or enter a business category', 'error');
         return false;
       }
     } 
     else if (currentStep === 2) {
       if (!formData.businessName) {
         setShowBusinessError(true);
-        Alert.alert('Validation Error', 'Business name is required');
+        showToast('Business name is required', 'error');
         return false;
       }
       if (!formData.pincode) {
         setShowBusinessError(true);
-        Alert.alert('Validation Error', 'Pincode is required');
+        showToast('Pincode is required', 'error');
         return false;
       }
       if (!formData.area || formData.area.trim() === '') {
         setShowBusinessError(true);
-        Alert.alert('Validation Error', 'Area/Locality is required');
+        showToast('Area/Locality is required', 'error');
         return false;
       }
       if (!formData.city) {
         setShowBusinessError(true);
-        Alert.alert('Validation Error', 'City is required');
+        showToast('City is required', 'error');
         return false;
       }
       if (!formData.cityId) {
         setShowBusinessError(true);
-        Alert.alert('Validation Error', 'Please select a valid city from the dropdown');
+        showToast('Please select a valid city from the dropdown', 'error');
         return false;
       }
     } 
     else if (currentStep === 3) {
       if (selectedDays.length === 0) {
         setShowTimingError(true);
-        Alert.alert('Validation Error', 'Please select at least one working day');
+        showToast('Please select at least one working day', 'error');
         return false;
       }
-      // Add validation for times
       if (!openingTime || !closingTime) {
         setShowTimingError(true);
-        Alert.alert('Validation Error', 'Please select opening and closing times');
+        showToast('Please select opening and closing times', 'error');
         return false;
       }
     } 
@@ -1125,7 +1317,7 @@ const VendorRegistration = () => {
       if (!formData.contactName || !formData.phone || !formData.email || !formData.password || !formData.confirmPassword) {
         setContactErrorMessage('All fields marked with * are required');
         setShowContactError(true);
-        Alert.alert('Validation Error', 'Please fill all required fields');
+        showToast('Please fill all required fields', 'error');
         return false;
       }
 
@@ -1133,48 +1325,45 @@ const VendorRegistration = () => {
       if (!emailRegex.test(formData.email)) {
         setContactErrorMessage('Please enter a valid email address');
         setShowContactError(true);
-        Alert.alert('Validation Error', 'Please enter a valid email address');
+        showToast('Please enter a valid email address', 'error');
         return false;
       }
 
       const phoneRegex = /^[6-9]\d{9}$/;
       if (!phoneRegex.test(formData.phone)) {
-        setContactErrorMessage('Please enter a valid 10-digit Indian mobile number (starts with 6,7,8,9)');
+        setContactErrorMessage('Please enter a valid 10-digit Indian mobile number');
         setShowContactError(true);
-        Alert.alert('Validation Error', 'Please enter a valid 10-digit Indian mobile number (starts with 6,7,8,9)');
+        showToast('Please enter a valid 10-digit Indian mobile number', 'error');
         return false;
       }
 
       if (formData.password.length < 6) {
         setContactErrorMessage('Password must be at least 6 characters');
         setShowContactError(true);
-        Alert.alert('Validation Error', 'Password must be at least 6 characters');
+        showToast('Password must be at least 6 characters', 'error');
         return false;
       }
 
       if (formData.password !== formData.confirmPassword) {
         setContactErrorMessage('Passwords do not match');
         setShowContactError(true);
-        Alert.alert('Validation Error', 'Passwords do not match');
+        showToast('Passwords do not match', 'error');
         return false;
       }
-    } 
-    else if (currentStep === 5) {
-      return true;
     } 
     else if (currentStep === 6) {
       if (!minPrice || !maxPrice || !priceUnit) {
-        Alert.alert('Validation Error', 'Please fill in all pricing fields');
+        showToast('Please fill in all pricing fields', 'error');
         return false;
       }
       if (parseInt(minPrice) >= parseInt(maxPrice)) {
-        Alert.alert('Validation Error', 'Minimum price should be less than maximum price');
+        showToast('Minimum price should be less than maximum price', 'error');
         return false;
       }
     } 
     else if (currentStep === 7) {
       if (!selectedPlan) {
-        Alert.alert('Validation Error', 'Please select a plan');
+        showToast('Please select a plan', 'error');
         return false;
       }
     }
@@ -1190,7 +1379,6 @@ const VendorRegistration = () => {
     }));
   };
 
-  // ============= NAVIGATION HANDLER =============
   const handleContinue = async () => {
     if (currentStep === 7) {
       if (!validateStep()) {
@@ -1259,31 +1447,10 @@ const VendorRegistration = () => {
         setShowSuccessModal(true);
         
       } catch (error) {
-        console.error('Registration failed:', error);
+        console.error('Registration failed completely:', error);
         
-        if (error.error) {
-          switch(error.error.code) {
-            case 'EMAIL_EXISTS':
-              setApiError('This email is already registered. Please use a different email.');
-              break;
-            case 'INVALID_PASSWORD':
-              setApiError('Password must be at least 6 characters long.');
-              break;
-            case 'VALIDATION_ERROR':
-              const errors = error.error.details?.errors || [];
-              setApiError(errors.map(e => e.message).join('\n'));
-              break;
-            case 'NETWORK_ERROR':
-              setApiError('Network error. Please check your internet connection.');
-              break;
-            default:
-              setApiError(error.error.message || 'Registration failed. Please try again.');
-          }
-        } else {
-          setApiError('An unexpected error occurred. Please try again.');
-        }
+        showToast('Unable to create your account. Please check your internet connection and try again.', 'error');
         
-        Alert.alert('Registration Failed', apiError);
       } finally {
         setIsSubmitting(false);
       }
@@ -1294,7 +1461,6 @@ const VendorRegistration = () => {
     }
   };
 
-  // ============= RENDER STEP CONTENT =============
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
@@ -1539,9 +1705,9 @@ const VendorRegistration = () => {
 
               <View style={styles.halfContainer}>
                 <Text style={styles.inputLabel}>Pincode *</Text>
-                <View style={[styles.inputBox, showBusinessError && !formData.pincode && styles.inputError]}>
+                <View style={[styles.pincodebox, showBusinessError && !formData.pincode && styles.inputError]}>
                   <TextInput
-                    placeholder="452001"
+                    placeholder="pincode"
                     placeholderTextColor="#9CA3AF"
                     style={styles.input}
                     keyboardType="numeric"
@@ -1571,9 +1737,9 @@ const VendorRegistration = () => {
               />
             </View>
 
-            <Text style={styles.inputLabel}>Full Address (Optional)</Text>
+            <Text style={styles.inputLabel}>Full Address<Text style={{ fontSize: 12, color: "#9CA3AF" }}> (Optional)</Text></Text>
             <View style={[styles.inputBox, styles.textAreaBox]}>
-              <FeatherIcon name="map" size={18} color="#8E8E98" style={styles.textAreaIcon} />
+              <FeatherIcon name="map" size={18} color="#8E8E98" marginTop={10} />
               <TextInput
                 placeholder="Building name, street, landmark..."
                 placeholderTextColor="#9CA3AF"
@@ -1652,7 +1818,6 @@ const VendorRegistration = () => {
               </View>
             </View>
 
-            {/* Opening Time Picker Modal */}
             <TimePickerModal
               visible={showOpeningTimePicker}
               onClose={() => setShowOpeningTimePicker(false)}
@@ -1661,7 +1826,6 @@ const VendorRegistration = () => {
               title="Select Opening Time"
             />
 
-            {/* Closing Time Picker Modal */}
             <TimePickerModal
               visible={showClosingTimePicker}
               onClose={() => setShowClosingTimePicker(false)}
@@ -1989,7 +2153,7 @@ const VendorRegistration = () => {
                   <Text style={styles.numberText}>3</Text>
                 </View>
                 <Text style={styles.pricingTitle}>
-                  Business Description (Optional)
+                  Business Description<Text style={{ fontSize: 12, color: "#9CA3AF" }}> (Optional)</Text>
                 </Text>
               </View>
 
@@ -2131,76 +2295,87 @@ const VendorRegistration = () => {
     }
   };
 
-  // ============= SUCCESS MODAL =============
-  const renderSuccessModal = () => (
-    <Modal
-      visible={showSuccessModal}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={() => {
-        setShowSuccessModal(false);
-        navigation.navigate('Home');
-      }}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.successIconWrapper}>
-            <View style={styles.successIconCircle}>
-              <FeatherIcon name="check" size={40} color="#FFFFFF" />
+  const renderSuccessModal = () => {
+    const isPaidPlan = selectedPlan !== 'Free';
+    
+    return (
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowSuccessModal(false);
+          navigation.navigate('Home');
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.successIconWrapper}>
+              <View style={styles.successIconCircle}>
+                <FeatherIcon name="check" size={40} color="#FFFFFF" />
+              </View>
             </View>
-          </View>
 
-          <Text style={styles.modalTitle}>Registration Successful!</Text>
-          
-          <Text style={styles.modalMessage}>
-            Your account has been created successfully. Please check your email 
-            ({formData.email}) for verification.
-          </Text>
-          
-          {registrationResponse?.data?.vendor?._id && (
-            <View style={styles.modalVendorCard}>
-              <Text style={styles.modalVendorLabel}>Your Vendor ID:</Text>
-              <Text style={styles.modalVendorId}>{registrationResponse.data.vendor._id}</Text>
-            </View>
-          )}
-          
-          <View style={styles.modalInfoCard}>
-            <View style={styles.modalInfoHeader}>
-              <FeatherIcon name="clock" size={18} color="#F59E0B" />
-              <Text style={styles.modalInfoTitle}>Pending Admin Approval</Text>
-            </View>
-            <Text style={styles.modalInfoText}>
-              Your profile and uploaded photos are pending admin approval. Once approved, 
-              your profile will be live and you can login to manage your dashboard.
+            <Text style={styles.modalTitle}>Registration Successful!</Text>
+            
+            <Text style={styles.modalMessage}>
+              Your account has been created successfully. Please check your email 
+              ({formData.email}) for verification.
             </Text>
-          </View>
-          
-          <TouchableOpacity
-            style={styles.modalLoginButton}
-            onPress={() => {
-              setShowSuccessModal(false);
-              navigation.navigate('Login', { 
-                email: formData.email,
-                message: 'Registration successful! Please login to continue.'
-              });
-            }}
-            activeOpacity={0.9}
-          >
-            <LinearGradient
-              colors={['#5B5BEA', '#E11D48']}
-              start={{x: 0, y: 0}}
-              end={{x: 1, y: 0}}
-              style={styles.modalLoginGradient}
+            
+            {isPaidPlan && (
+              <View style={localStyles.paymentReminderInline}>
+                <FeatherIcon name="credit-card" size={16} color="#F59E0B" />
+                <Text style={localStyles.paymentReminderInlineText}>
+                  To activate your {selectedPlan} plan features, please complete the payment from your vendor dashboard.
+                </Text>
+              </View>
+            )}
+            
+            {registrationResponse?.data?.vendor?._id && (
+              <View style={styles.modalVendorCard}>
+                <Text style={styles.modalVendorLabel}>Your Vendor ID:</Text>
+                <Text style={styles.modalVendorId}>{registrationResponse.data.vendor._id}</Text>
+              </View>
+            )}
+            
+            <View style={styles.modalInfoCard}>
+              <View style={styles.modalInfoHeader}>
+                <FeatherIcon name="clock" size={18} color="#F59E0B" />
+                <Text style={styles.modalInfoTitle}>Pending Admin Approval</Text>
+              </View>
+              <Text style={styles.modalInfoText}>
+                Your profile and uploaded photos are pending admin approval. Once approved, 
+                your profile will be live and you can login to manage your dashboard.
+              </Text>
+            </View>
+            
+            <TouchableOpacity
+              style={styles.modalLoginButton}
+              onPress={() => {
+                setShowSuccessModal(false);
+                navigation.navigate('Login', { 
+                  email: formData.email,
+                  message: 'Registration successful! Please login to continue.'
+                });
+              }}
+              activeOpacity={0.9}
             >
-              <Text style={styles.modalLoginText}>Login Now</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={['#5B5BEA', '#E11D48']}
+                start={{x: 0, y: 0}}
+                end={{x: 1, y: 0}}
+                style={styles.modalLoginGradient}
+              >
+                <Text style={styles.modalLoginText}>Login Now</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </Modal>
-  );
+      </Modal>
+    );
+  };
 
-  // ============= MAIN RENDER =============
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView 
@@ -2310,11 +2485,17 @@ const VendorRegistration = () => {
       )}
 
       {renderSuccessModal()}
+      
+      <Toast 
+        visible={toast.visible} 
+        message={toast.message} 
+        type={toast.type} 
+        onHide={() => setToast({ ...toast, visible: false })}
+      />
     </SafeAreaView>
   );
 };
 
-// ============= LOCAL STYLES FOR TIME PICKER =============
 const localStyles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
@@ -2435,6 +2616,22 @@ const localStyles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#F3F4F6',
     marginLeft: 8,
+  },
+  paymentReminderInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginBottom: 16,
+    gap: 8,
+  },
+  paymentReminderInlineText: {
+    fontSize: 13,
+    color: '#92400E',
+    flex: 1,
+    lineHeight: 18,
   },
 });
 
